@@ -1,0 +1,242 @@
+---
+title: "fieldwork_data_monitoring"
+format: html
+editor: visual
+---
+
+Packages
+
+```{r}
+# /Users/danifreund/Desktop/Classes/Spring 2023/PUBH 7462 Advanced Programming in R/Final_Project/fieldwork_data_monitoring
+library(googledrive) # for downloading google files
+library(utils) # includes the tempfile() function
+library(ggplot2) # for making static plots
+library(plotly) # for making interactive plots
+library(shiny) # for making a shiny dashboard
+library(kableExtra) # for making tables
+library(here)
+library(sp) # for mapping
+library(sf) # replacing sp
+library(terra) # for mapping
+library(ggmap) # for bounding box
+library(maptiles)
+library(raster)
+library(rgeos)
+library(leaflet)
+library(rgdal)
+```
+
+Downloading data from google drive
+
+```{r}
+# sometimes need this to authorize access to my google drive account
+# drive_auth()
+
+here()
+
+file.download <- function(ID){
+  file_id <- ID
+  temp_file <- tempfile(fileext = ".csv") # creating a temporary file with .csv
+  file <- drive_download(as_id(file_id),  path = temp_file)
+  read.csv(temp_file)
+}
+
+transects <- file.download("128b7VHsaOiV9ZMdtM0DvEitaFL5_1jC2OHmTW56UfUQ")
+snares <- file.download("1omX0nEJuQ1yhDEN9BQKks8uOF-rGxS5SfvtvR9ZB36c")
+progress <- file.download("1nEKOwT6nyV6lR-GEFP-XFKG6Trn-WzE95dFecOf7Wf4")
+ponds <- readOGR("2019_BeaverPonds/Master_2019_BeaverPonds.shp") #NAD83 / UTM zone 15N
+
+crs(ponds)
+```
+
+Converting CRS
+
+```{r}
+# FUNCTION converting csv files to coordinates 
+converting.lat.long <- function(data,northing,easting){
+  data_sp <- SpatialPointsDataFrame(coords = data[, c(northing, easting)], 
+                                    data = data, 
+                                    proj4string = CRS("+proj=utm +zone=15 +datum=WGS84 +units=m"))
+# Transform to WGS84 CRS
+wgs84_crs <- CRS("+proj=longlat +datum=WGS84")
+data_wgs84 <- spTransform(data_sp, wgs84_crs)
+
+# Extract latitude and longitude coordinates
+data$longitude <- coordinates(data_wgs84)[, 1]
+data$latitude <- coordinates(data_wgs84)[, 2]
+
+return(data)
+}
+
+# converting the files
+snares<-converting.lat.long(snares,"northing","easting")
+transects.start<-converting.lat.long(transects,"start_easting","start_northing")
+transects.end<-converting.lat.long(transects,"end_easting","end_northing")
+
+# converting ponds file
+ponds_wgs84 <- spTransform(ponds, wgs84_crs)
+```
+
+Creating a Map
+
+```{r}
+# creating study area map
+studyarea <- get_stamenmap(
+  bbox = c(left = -92.8309, bottom = 48.2967, right = -92.7743, top = 48.3211),
+  maptype = "terrain",
+  zoom = 13 # found in URL
+)
+
+# creating a plotly map
+map<-ggmap(studyarea) +
+  geom_point(
+             data = snares,
+             aes(x = longitude, y = latitude),
+             size = 0.8,
+             shape = 16,
+             alpha = 0.6) +
+  scale_colour_viridis_c("Snare ID") +
+  theme(legend.position = "right")
+
+ggplotly(map)
+
+# creating a leaflet
+# leaflet automatically knows which points to plot --- SO COOL
+leaflet(data = snares) %>% 
+  addProviderTiles("Stamen.Toner"
+    ) %>% 
+  addPolygons(data = ponds_wgs84,
+              color = "navy") %>% 
+  addCircleMarkers(data = snares,
+    label = ~ beaver.feature,
+    color = "gold",
+    fillColor = "gold",
+    fillOpacity = 1
+    ) %>% 
+   addCircleMarkers(data = transects.start,
+    opacity = 1,
+    weight = 2,
+    radius = 4,
+    color = "green",
+    fillColor = "green",
+    fillOpacity = 1,
+    label = ~ transect_or_trail_ID
+    ) %>% 
+   addCircleMarkers(data = transects.end,
+    weight = 2,
+    radius = 4,
+    color = "red",
+    fillColor = "red",
+    fillOpacity = 1,
+    label = ~ transect_or_trail_ID
+    ) 
+
+ggmap(ponds)
+
+```
+
+shiny app
+
+```{r}
+
+# Define UI for application that draws a histogram
+ui <- fluidPage(
+
+    # Application title
+    titlePanel("Fieldwork Monitoring"),
+
+    # Sidebar with a slider input for number of bins 
+    sidebarLayout(
+        sidebarPanel(
+            selectInput("hair.snare.id",
+                        "Hair Snare",
+                        choices = snares$hair.snare.id)
+        ),
+        # Show a plot of the generated distribution
+        mainPanel(
+           leafletOutput("leaflet")
+        )
+    )
+)
+
+# Define server logic required to draw a histogram
+server <- function(input, output) {
+  output$leaflet <- renderLeaflet({
+    leaflet(data = snares) %>% 
+  addProviderTiles("Stamen.Terrain") %>% 
+  addCircleMarkers(
+    opacity = 0.4,
+    weight = 2,
+    radius = 4,
+  )
+  })
+}
+
+# Run the application 
+shinyApp(ui = ui, server = server)
+
+
+```
+
+graphs
+
+```{r}
+data %>% ggplot() + geom_bar(aes(x = snare_ID))
+```
+
+```{r}
+# Define UI for the application
+ui <- fluidPage(
+      h1(strong("Wolf predation of Beavers: Data Monitoring")),
+      h2(em("Dani Freund")),
+      strong("The total number of trees recorded today is"),
+      textOutput("answer"),
+      strong("Todays Date"),
+      textOutput("answer.1"),
+  # Add a sidebar layout to the application
+  sidebarLayout(
+  # Add the text "Shiny is fun"
+  # Add a sidebar panel around the text and inputs
+    sidebarPanel(
+      h4("Plot Parameters"),
+      checkboxInput("fit","Add line of best fit", FALSE),
+      # adding snare selector
+      selectInput("snare","Snare",
+                  choices = levels(data$snare_ID),
+                  multiple = TRUE,
+                  selected = "snare_05")
+      ),
+    mainPanel(
+      titlePanel("Beaver Stress"),
+      plotOutput("plot"),
+      plotOutput("plot.1"),
+      tableOutput("table"))
+))
+
+# Define the server logic
+server <- function(input, output) {
+  output$answer <- renderText({
+    (sum(as.numeric(data$number_of_trees_and_stumps_recorded), na.rm=TRUE))
+  })
+  output$answer.1 <- renderText({
+    "09-26-2022"
+  })
+  output$plot <- renderPlot({
+   p<-ggplot(data, aes(x=snare_ID, y = number_of_trees_and_stumps_recorded))+
+      geom_point() + theme_classic()
+    p
+    })
+  output$plot.1 <- renderPlot({
+    data <- subset(data,
+                   snare_ID %in% input$snare)
+    p.1<-ggplot(data, aes(x=snare_ID)) + geom_bar()
+    p.1
+    })
+  output$table <- renderTable({
+  data[]
+  })
+}
+
+# Run the application
+shinyApp(ui = ui, server = server)
+```
