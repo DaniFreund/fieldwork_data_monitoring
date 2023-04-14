@@ -1,12 +1,12 @@
 ---
-title: "fieldwork_data_monitoring"
-format: html
+title: "Tracking Wolf-Beaver Stress Field Season 2023"
+format: 
+  html:
+    theme: lux
 editor: visual
 ---
 
-Packages
-
-```{r}
+```{r, include=FALSE}
 # /Users/danifreund/Desktop/Classes/Spring 2023/PUBH 7462 Advanced Programming in R/Final_Project/fieldwork_data_monitoring
 library(googledrive) # for downloading google files
 library(utils) # includes the tempfile() function
@@ -24,13 +24,20 @@ library(raster)
 library(rgeos)
 library(leaflet)
 library(rgdal)
+library(tidyr)
+library(lubridate)
+library(geosphere)  
+library(stringr)
+library(jtools)
+library(viridis, quietly = TRUE)
+
 ```
 
-Downloading data from google drive
+```{r, include=FALSE}
+# DOWNLOADING DATA FROM GOOGLE DRIVE
 
-```{r}
 # sometimes need this to authorize access to my google drive account
-# drive_auth()
+drive_deauth()
 
 here()
 
@@ -45,13 +52,46 @@ transects <- file.download("128b7VHsaOiV9ZMdtM0DvEitaFL5_1jC2OHmTW56UfUQ")
 snares <- file.download("1omX0nEJuQ1yhDEN9BQKks8uOF-rGxS5SfvtvR9ZB36c")
 progress <- file.download("1nEKOwT6nyV6lR-GEFP-XFKG6Trn-WzE95dFecOf7Wf4")
 ponds <- readOGR("2019_BeaverPonds/Master_2019_BeaverPonds.shp") #NAD83 / UTM zone 15N
-
-crs(ponds)
+ponds<-st_read("2019_BeaverPonds/Master_2019_BeaverPonds.shp")
+roads <- st_read("/Users/danifreund/Desktop/Research/Beaver Hair/BeaverHair_R/roads/trails.reprojected/trails_reprojected.shx")
 ```
 
-Converting CRS
+### **WAS ALL WORK ASSIGNED TODAY FINISHED?**
 
-```{r}
+```{r, echo=FALSE, warning = FALSE}
+# FIGURING OUT IF ANY PONDS ASSIGNED THAT DAY WERE NOT COMPLETED
+
+if (any(progress$in.progress == "yes")) {
+  data <- progress[in.progress != "yes", ]
+  message(warn_wrap("Ponds not completed today include ", 
+          paste(data$a.snare.id, collapse = ", ")))
+    dplyr::select(data, personnel, "snare" = a.snare.id) %>% 
+      kbl() %>%
+      kable_styling()
+}else{
+  message("All ponds assigned today were completed")}
+```
+
+### **HAS ALL DATA BEEN UPLOADED?**
+
+```{r, echo=FALSE, warning = FALSE}
+# FIGURING OUT IF DATA UPLOAD IS COMPLETE 
+
+if (any(progress$data.upload.complete != "yes")) {
+    data <- progress[progress$data.upload.complete != "yes", ]
+    message(warn_wrap("Data upload is not complete for ", 
+          paste(data$a.snare.id, collapse = ", ")))
+    dplyr::select(data, personnel, "snare" = a.snare.id) %>% 
+      kbl() %>%
+      kable_styling()
+  }else{
+    message("All data uploaded for today")}
+```
+
+### **MAP OF WHAT HAS BEEN COMPLETED SO FAR**
+
+```{r, include=FALSE}
+# CONVERTING CRS
 # FUNCTION converting csv files to coordinates 
 converting.lat.long <- function(data,northing,easting){
   data_sp <- SpatialPointsDataFrame(coords = data[, c(northing, easting)], 
@@ -72,14 +112,50 @@ return(data)
 snares<-converting.lat.long(snares,"northing","easting")
 transects.start<-converting.lat.long(transects,"start_easting","start_northing")
 transects.end<-converting.lat.long(transects,"end_easting","end_northing")
+transects<-converting.lat.long(transects,"start_easting","start_northing")
+transects <- transects %>% rename("longitude_start"= "longitude",
+                                    "latitude_start"= "latitude")
+transects<-converting.lat.long(transects,"end_easting","end_northing")
+transects <- transects %>% rename("longitude_end"= "longitude",
+                                    "latitude_end"= "latitude")
+
 
 # converting ponds file
-ponds_wgs84 <- spTransform(ponds, wgs84_crs)
+#ponds_wgs84 <- spTransform(ponds$geometry, wgs84_crs)
 ```
 
-Creating a Map
+```{r, include=FALSE}
+# CLIPPING PONDS TO SNARES
 
-```{r}
+# Convert the points dataframe to a spatial dataframe with points
+# Specify the latitude and longitude columns in the points dataframe
+points_sf <- st_as_sf(snares, coords = c("longitude", "latitude"), crs = 4269)
+
+# changing polygons reference system
+ponds<-st_transform(ponds, crs=4269)
+roads<-st_transform(roads, crs=4269)
+
+# fixing invalid geometries in the ponds dataframe
+# checking for invalid geometries
+invalid_geometries<-st_is_valid(ponds)
+# fixing invalid geometries
+data <- st_make_valid(ponds)
+
+# Extract the extent of the points dataframe
+points_extent <- st_as_sfc(st_bbox(points_sf))
+
+# Clip the polygons dataframe to the extent of the points dataframe
+ponds <- st_intersection(data, points_extent)
+roads <- st_intersection(roads, points_extent)
+
+# adding if snare has collected enough hair to snare file
+progress.1<-dplyr::select(progress, "a.snare.id", "enough.hair.collected")
+colnames(progress.1) <- c("hair.snare.id","enough.hair.collected")
+snares <- merge(snares, progress.1, by='hair.snare.id')
+
+```
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
 # creating study area map
 studyarea <- get_stamenmap(
   bbox = c(left = -92.8309, bottom = 48.2967, right = -92.7743, top = 48.3211),
@@ -96,147 +172,326 @@ map<-ggmap(studyarea) +
              shape = 16,
              alpha = 0.6) +
   scale_colour_viridis_c("Snare ID") +
-  theme(legend.position = "right")
+  theme(legend.position = "right") 
 
-ggplotly(map)
+# making lines between points
+# re-naming columns
+transects <- transects %>% rename("s_northing"= "start_northing",
+                                    "s_easting"= "start_easting",
+                                  "e_northing"= "end_northing",
+                                    "e_easting"= "end_easting")
+
+transects.long <- transects %>% pivot_longer(
+  cols = starts_with(c("longitude","latitude")),
+  names_to = c(".value","type"),
+  names_sep="_"
+)
+
+# Define a color palette
+ color_pal <- colorFactor(
+   palette = c("darkred","red","blue","darkcyan"),  # Define the colors for "active" and "inactive"
+   domain = snares$enough.hair.collected)  # Specify the column containing the values
+ 
+#Extract the levels/order of shop type factor
+types <- levels(as.factor(snares$enough.hair.collected))
+n_types <- length(types)
+color_pal <- colorFactor(viridis_pal(option = "D")(n_types), levels = types)
+
 
 # creating a leaflet
 # leaflet automatically knows which points to plot --- SO COOL
-leaflet(data = snares) %>% 
+leaf<- leaflet(data = snares) %>% 
   addProviderTiles("Stamen.Toner"
     ) %>% 
-  addPolygons(data = ponds_wgs84,
-              color = "navy") %>% 
+  addPolygons(data = ponds,
+              color = "black",
+              opacity = 1,
+              fillOpacity = 0.6
+              ) %>% 
+  addPolylines(data = roads,
+               color = "grey",
+               opacity = 1) %>% 
   addCircleMarkers(data = snares,
-    label = ~ beaver.feature,
-    color = "gold",
-    fillColor = "gold",
-    fillOpacity = 1
+    color = ~color_pal(enough.hair.collected),
+    fillOpacity = 1,
+    label = ~hair.snare.id
     ) %>% 
+    addLegend(data = snares,
+    title    = "Snare Deployed?",
+    position = "bottomright",
+    colors = viridis_pal(option = "D")(n_types),
+    labels = types
+  ) %>% 
    addCircleMarkers(data = transects.start,
     opacity = 1,
     weight = 2,
     radius = 4,
-    color = "green",
-    fillColor = "green",
+    color = "lightgreen",
+    fillColor = "lightgreen",
     fillOpacity = 1,
     label = ~ transect_or_trail_ID
     ) %>% 
    addCircleMarkers(data = transects.end,
     weight = 2,
     radius = 4,
-    color = "red",
-    fillColor = "red",
+    color = "darkgreen",
+    fillColor = "darkgreen",
     fillOpacity = 1,
-    label = ~ transect_or_trail_ID
-    ) 
+    label = ~ transect_or_trail_ID) 
 
-ggmap(ponds)
+for(i in 1:nrow(transects.start)) {
+  # Add polylines for each row
+  leaf <- leaf %>% 
+    addPolylines(lng = c(transects.start[i, "longitude"], 
+                         transects.end[i, "longitude"]),
+                 lat = c(transects.start[i, "latitude"], 
+                         transects.end[i, "latitude"]),
+                 color = "green")}
 
+leaf
 ```
 
-shiny app
+### PROGRESS
 
-```{r}
+```{r, echo=FALSE, warning = FALSE}
+# GRAPH OF POND SAMPLING PROGRESS
 
-# Define UI for application that draws a histogram
-ui <- fluidPage(
+# changing variables to numeric
+progress$predicted.days.left <- as.numeric(progress$predicted.days.left)
+progress$total.days.to.complete <- as.numeric(progress$total.days.to.complete)
 
-    # Application title
-    titlePanel("Fieldwork Monitoring"),
-
-    # Sidebar with a slider input for number of bins 
-    sidebarLayout(
-        sidebarPanel(
-            selectInput("hair.snare.id",
-                        "Hair Snare",
-                        choices = snares$hair.snare.id)
-        ),
-        # Show a plot of the generated distribution
-        mainPanel(
-           leafletOutput("leaflet")
-        )
-    )
+# pivoting data longer
+progress.1 <- progress %>% pivot_longer(
+  cols = c(predicted.days.left, total.days.to.complete)
 )
 
-# Define server logic required to draw a histogram
-server <- function(input, output) {
-  output$leaflet <- renderLeaflet({
-    leaflet(data = snares) %>% 
-  addProviderTiles("Stamen.Terrain") %>% 
-  addCircleMarkers(
-    opacity = 0.4,
-    weight = 2,
-    radius = 4,
-  )
-  })
-}
+# Total days to complete each snare
+ggplotly(progress.1 %>% 
+  ggplot(aes(x = a.snare.id, y=value, fill = name)) +
+  geom_histogram(stat = "identity", position = "stack") + 
+  labs(y = "Days", x = "Snare ID") +
+  scale_fill_manual(values = c("darkred", "darkcyan"),
+                    name = "Progress", labels = c("predicted.days.left" = "Predicted days left", "total.days.to.complete" = "Days already spent in field")) +
+  theme_classic() + 
+  coord_flip())
 
-# Run the application 
-shinyApp(ui = ui, server = server)
+```
+
+```{r, include=FALSE}
+# SHINY APP
+#Define UI for application that draws a histogram
+# ui <- fluidPage(
+#  
+#      # Application title
+#      titlePanel("Fieldwork Monitoring"),
+#  
+#      # Sidebar with a slider input for number of bins 
+#      sidebarLayout(
+#          sidebarPanel(
+#              selectInput("hair.snare.id",
+#                          "Hair Snare",
+#                          choices = snares$hair.snare.id)
+#          ),
+#          # Show a plot of the generated distribution
+#          mainPanel(
+#             leafletOutput("leaflet")
+#          )
+#      )
+#  )
+#  
+# #  Define server logic required to draw a histogram
+#  server <- function(input, output) {
+#    output$leaflet <- renderLeaflet({
+#      leaflet(data = snares) %>% 
+#    addProviderTiles("Stamen.Terrain") %>% 
+#     addPolygons(data = ponds,
+#      color = "navy") %>% 
+#    addCircleMarkers(data = snares,
+#      label = ~ hair.snare.id,
+#      color = "gold",
+#      fillColor = "gold",
+#      fillOpacity = 1
+#      ) %>% 
+#    addCircleMarkers(data = transects.start,
+#      opacity = 1,
+#      weight = 2,
+#      radius = 4,
+#      color = "green",
+#      fillColor = "green",
+#      fillOpacity = 1,
+#      label = ~ transect_or_trail_ID) %>% 
+#    addCircleMarkers(data = transects.end,
+#      weight = 2,
+#      radius = 4,
+#      color = "red",
+#      fillColor = "red",
+#      fillOpacity = 1,
+#      label = ~ transect_or_trail_ID)
+#    })
+#  }
+#  
+#  # Run the application 
+# shinyApp(ui = ui, server = server)
 
 
 ```
 
-graphs
-
-```{r}
-data %>% ggplot() + geom_bar(aes(x = snare_ID))
+```{r, include=FALSE}
+# # Define UI for the application
+# ui <- fluidPage(
+#       h1(strong("Wolf predation of Beavers: Data Monitoring")),
+#       h2(em("Dani Freund")),
+#       strong("The total number of trees recorded today is"),
+#       textOutput("answer"),
+#       strong("Todays Date"),
+#       textOutput("answer.1"),
+#   # Add a sidebar layout to the application
+#   sidebarLayout(
+#   # Add the text "Shiny is fun"
+#   # Add a sidebar panel around the text and inputs
+#     sidebarPanel(
+#       h4("Plot Parameters"),
+#       checkboxInput("fit","Add line of best fit", FALSE),
+#       # adding snare selector
+#       selectInput("snare","Snare",
+#                   choices = levels(data$snare_ID),
+#                   multiple = TRUE,
+#                   selected = "snare_05")
+#       ),
+#     mainPanel(
+#       titlePanel("Beaver Stress"),
+#       plotOutput("plot"),
+#       plotOutput("plot.1"),
+#       tableOutput("table"))
+# ))
+# 
+# # Define the server logic
+# server <- function(input, output) {
+#   output$answer <- renderText({
+#     (sum(as.numeric(data$number_of_trees_and_stumps_recorded), na.rm=TRUE))
+#   })
+#   output$answer.1 <- renderText({
+#     "09-26-2022"
+#   })
+#   output$plot <- renderPlot({
+#    p<-ggplot(data, aes(x=snare_ID, y = number_of_trees_and_stumps_recorded))+
+#       geom_point() + theme_classic()
+#     p
+#     })
+#   output$plot.1 <- renderPlot({
+#     data <- subset(data,
+#                    snare_ID %in% input$snare)
+#     p.1<-ggplot(data, aes(x=snare_ID)) + geom_bar()
+#     p.1
+#     })
+#   output$table <- renderTable({
+#   data[]
+#   })
+# }
+# 
+# # Run the application
+# shinyApp(ui = ui, server = server)
 ```
 
-```{r}
-# Define UI for the application
-ui <- fluidPage(
-      h1(strong("Wolf predation of Beavers: Data Monitoring")),
-      h2(em("Dani Freund")),
-      strong("The total number of trees recorded today is"),
-      textOutput("answer"),
-      strong("Todays Date"),
-      textOutput("answer.1"),
-  # Add a sidebar layout to the application
-  sidebarLayout(
-  # Add the text "Shiny is fun"
-  # Add a sidebar panel around the text and inputs
-    sidebarPanel(
-      h4("Plot Parameters"),
-      checkboxInput("fit","Add line of best fit", FALSE),
-      # adding snare selector
-      selectInput("snare","Snare",
-                  choices = levels(data$snare_ID),
-                  multiple = TRUE,
-                  selected = "snare_05")
-      ),
-    mainPanel(
-      titlePanel("Beaver Stress"),
-      plotOutput("plot"),
-      plotOutput("plot.1"),
-      tableOutput("table"))
+### PROJECT TIMELINE
+
+```{r, echo=FALSE, warning = FALSE, message = FALSE}
+# downloading file
+timeline <- file.download("1Sx0BsRC1efS-JvElZSVE-OP3ANeHr-ZJ84HsWKSRn60")
+# CREATING TIMELINE
+# defining the date
+timeline$date <- with(timeline, ymd(sprintf('%04d%02d%02d', year, month, day)))
+timeline <- timeline[with(timeline, order(date)), ]
+
+# defining projects
+project_levels <- c("hair snares", "vegetation availability", "physiological validation", "biological validation")
+project_colors <- c("#0070C0", "#00B050", "#FFC000", "#C00000")
+timeline$project <- factor(timeline$project, levels=project_levels, ordered=TRUE)
+
+# orienting milestones
+positions <- c(0.5, -0.5, 1.0, -1.0, 1.5, -1.5)
+directions <- c(1, -1)
+
+line_pos <- data.frame(
+    "date"=unique(timeline$date),
+    "position"=rep(positions, length.out=length(unique(timeline$date))),
+    "direction"=rep(directions, length.out=length(unique(timeline$date)))
+)
+
+timeline <- merge(x=timeline, y=line_pos, by="date", all = TRUE)
+timeline <- timeline[with(timeline, order(date, milestone)), ]
+
+# seeing if we have more than one event per month
+text_offset <- 0.08
+timeline$month_count <- ave(timeline$date==timeline$date, timeline$date, FUN=cumsum)
+# offsetting events if there is more than one per month
+timeline$text_position <- (timeline$month_count * text_offset * timeline$direction) + timeline$position
+
+# creating dataframe that has all of the months, not just the months with events
+month_buffer <- 2 # starting two months before and ending two months after milestone
+month_date_range <- seq(min(timeline$date) - months(month_buffer), max(timeline$date) + months(month_buffer), by='month')
+month_format <- format(month_date_range, '%b %d')
+month_df <- data.frame(month_date_range, month_format)
+
+# doing the same for days
+# day_date_range <- seq(min(timeline$date) - months(month_buffer), max(timeline$date) + months(month_buffer), by='day')
+# day_date_range <- as.Date(
+#     intersect(
+#         ceiling_date(day_date_range, unit="day"),
+#         floor_date(day_date_range, unit="day")
+#     ),  origin = "1970-01-01"
+# )
+# day_format <- format(day_date_range, '%d')
+# day_df <- data.frame(day_date_range, day_format)
+
+# doing the same for years that we want to display
+year_format <- format(month_date_range, '%Y')
+year_df <- data.frame(month_date_range, year_format)
+year_df <- year_df %>% group_by(year_format=year_format) %>% dplyr::summarize(month_date_range = min(month_date_range)) 
+
+# adding label
+timeline <- timeline %>% mutate(text_label=str_c(
+  "\nDate: ", date,
+  "\nRationale: ", rationale
 ))
 
-# Define the server logic
-server <- function(input, output) {
-  output$answer <- renderText({
-    (sum(as.numeric(data$number_of_trees_and_stumps_recorded), na.rm=TRUE))
-  })
-  output$answer.1 <- renderText({
-    "09-26-2022"
-  })
-  output$plot <- renderPlot({
-   p<-ggplot(data, aes(x=snare_ID, y = number_of_trees_and_stumps_recorded))+
-      geom_point() + theme_classic()
-    p
-    })
-  output$plot.1 <- renderPlot({
-    data <- subset(data,
-                   snare_ID %in% input$snare)
-    p.1<-ggplot(data, aes(x=snare_ID)) + geom_bar()
-    p.1
-    })
-  output$table <- renderTable({
-  data[]
-  })
-}
+# plotting the timeline
+timeline_plot<-ggplot(timeline,aes(x=date, y=0, col=project, label=milestone))
+timeline_plot<-timeline_plot+labs(col="Projects")
+timeline_plot<-timeline_plot+scale_color_manual(values=project_colors, labels=project_levels, drop = FALSE)
+timeline_plot<-timeline_plot+theme_classic()
 
-# Run the application
-shinyApp(ui = ui, server = server)
+# Plot horizontal black line for timeline
+timeline_plot<-timeline_plot+geom_hline(yintercept=0, 
+                color = "black", linewidth=0.3)
+
+# Plot vertical segment lines for milestones
+timeline_plot<-timeline_plot+geom_segment(data=timeline[timeline$month_count == 1,], aes(y=position,yend=0,xend=date), color='black', size=0.2)
+
+# Plot scatter points at zero and date
+timeline_plot<-timeline_plot+geom_point(aes(y=0), size=3)
+
+# Don't show axes, appropriately position legend
+timeline_plot<-timeline_plot+theme(axis.line.y=element_blank(),
+                 axis.text.y=element_blank(),
+                 axis.title.x=element_blank(),
+                 axis.title.y=element_blank(),
+                 axis.ticks.y=element_blank(),
+                 axis.text.x =element_blank(),
+                 axis.ticks.x =element_blank(),
+                 axis.line.x =element_blank(),
+                 legend.position = "bottom"
+                )
+
+# show day text
+timeline_plot<-timeline_plot+geom_text(data=month_df,aes(x=month_date_range,y=-0.2, label=month_format),size=2.5,vjust=0.5, color='black', angle=90)
+
+# Show text for each month
+# timeline_plot<-timeline_plot+geom_text(data=month_df, aes(x=month_date_range,y=-0.1,label=month_format),size=2.5,vjust=0.5, color='black', angle=90)
+#Show year text
+timeline_plot<-timeline_plot+geom_text(data=year_df, aes(x=month_date_range,y=-0.4,label=year_format, fontface="bold", ),size=2.5, color='black')
+# Show text for each milestone
+timeline_plot<-timeline_plot+geom_text(aes(y=text_position,label=milestone),size=2.5, fontface="bold")
+
+timeline_plot
 ```
