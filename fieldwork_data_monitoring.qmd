@@ -3,6 +3,7 @@ title: "Tracking Wolf-Beaver Stress Field Season 2023"
 format: 
   html:
     theme: lux
+    embed-resources: true
 editor: visual
 ---
 
