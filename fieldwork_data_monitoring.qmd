@@ -50,9 +50,10 @@ file.download <- function(ID){
 transects <- file.download("128b7VHsaOiV9ZMdtM0DvEitaFL5_1jC2OHmTW56UfUQ")
 snares <- file.download("1omX0nEJuQ1yhDEN9BQKks8uOF-rGxS5SfvtvR9ZB36c")
 progress <- file.download("1nEKOwT6nyV6lR-GEFP-XFKG6Trn-WzE95dFecOf7Wf4")
+video.entry <- file.download("1zi9SEN0MQs9uOO9Xs-vv9DSmnOBPwBHPDE4nqIMjI7M")
 ponds <- readOGR("2019_BeaverPonds/Master_2019_BeaverPonds.shp") #NAD83 / UTM zone 15N
 ponds<-st_read("2019_BeaverPonds/Master_2019_BeaverPonds.shp")
-roads <- st_read("/Users/danifreund/Desktop/Research/Beaver_Hair/BeaverHair_R/roads/trails.reprojected/trails_reprojected.shp")
+roads <- st_read("roads/trails.reprojected/trails_reprojected.shp")
 ```
 
 ### **WAS ALL WORK ASSIGNED TODAY FINISHED?**
@@ -434,7 +435,7 @@ timeline <- merge(x=timeline, y=line_pos, by="date", all = TRUE)
 timeline <- timeline[with(timeline, order(date, milestone)), ]
 
 # seeing if we have more than one event per month
-text_offset <- 0.08
+text_offset <- 0.15
 timeline$month_count <- ave(timeline$date==timeline$date, timeline$date, FUN=cumsum)
 # offsetting events if there is more than one per month
 timeline$text_position <- (timeline$month_count * text_offset * timeline$direction) + timeline$position
@@ -503,7 +504,8 @@ timeline_plot<-timeline_plot+geom_text(data=month_df,aes(x=month_date_range,y=-0
 #Show year text
 timeline_plot<-timeline_plot+geom_text(data=year_df, aes(x=month_date_range,y=-0.4,label=year_format, fontface="bold", ),size=2.5, color='black')
 # Show text for each milestone
-timeline_plot<-timeline_plot+geom_text(aes(y=text_position,label=milestone),size=2.5, fontface="bold")
+timeline_plot<-timeline_plot+
+  geom_text(aes(y=text_position,label=str_wrap(milestone, width=30)),size=2.5, fontface="bold")
 
 timeline_plot
 ```
