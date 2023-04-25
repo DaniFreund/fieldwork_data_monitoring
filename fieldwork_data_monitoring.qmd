@@ -10,7 +10,6 @@ editor: visual
 ```{r, include=FALSE}
 # /Users/danifreund/Desktop/Classes/Spring 2023/PUBH 7462 Advanced Programming in R/Final_Project/fieldwork_data_monitoring
 library(googledrive) # for downloading google files
-library(utils) # includes the tempfile() function
 library(ggplot2) # for making static plots
 library(plotly) # for making interactive plots
 library(shiny) # for making a shiny dashboard
@@ -21,7 +20,6 @@ library(sf) # replacing sp
 library(terra) # for mapping
 library(ggmap) # for bounding box
 library(maptiles)
-library(raster)
 library(rgeos)
 library(leaflet)
 library(rgdal)
