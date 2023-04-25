@@ -34,7 +34,6 @@ jobs:
         with:
             packages:
                any::googledrive
-               any::utils
                any::ggplot2
                any::plotly
                any::shiny
@@ -45,7 +44,6 @@ jobs:
                any::terra
                any::ggmap
                any::maptiles
-               any::raster
                any::rgeos
                any::leaflet
                any::rgdal
