@@ -218,7 +218,7 @@ leaf<- leaflet(data = snares) %>%
     label = ~hair.snare.id
     ) %>% 
     addLegend(data = snares,
-    title    = "Snare Deployed?",
+    title    = "Enough Hair Collected?",
     position = "bottomright",
     colors = viridis_pal(option = "D")(n_types),
     labels = types
@@ -260,22 +260,35 @@ leaf
 # changing variables to numeric
 progress$predicted.days.left <- as.numeric(progress$predicted.days.left)
 progress$total.days.to.complete <- as.numeric(progress$total.days.to.complete)
+progress$a.snare.id <- as.factor(progress$a.snare.id)
 
 # pivoting data longer
 progress.1 <- progress %>% pivot_longer(
   cols = c(predicted.days.left, total.days.to.complete)
 )
 
+# changing labels for figure legend
+progress.1$name <- ifelse(progress.1$name == "total.days.to.complete", "Total days to complete", "Predicted days left")
+
 # Total days to complete each snare
-ggplotly(progress.1 %>% 
-  ggplot(aes(x = a.snare.id, y=value, fill = name)) +
-  geom_histogram(stat = "identity", position = "stack") + 
+p <- progress.1 %>%
+  mutate(
+    text_label = str_c( #add as text aesthetic
+                       "Personnel: "  ,  personnel, 
+                       "\nTrail Notes: ", trails.recorded,
+                        "\nTransect Notes: ", transects.recorded)) %>% 
+  ggplot(aes(x = a.snare.id, y=value, 
+             fill = name,
+             text = text_label)) +
+  geom_histogram(stat = "identity", 
+                 position = "stack") + 
   labs(y = "Days", x = "Snare ID") +
   scale_fill_manual(values = c("darkred", "darkcyan"),
-                    name = "Progress", labels = c("predicted.days.left" = "Predicted days left", "total.days.to.complete" = "Days already spent in field")) +
-  theme_classic() + 
-  coord_flip())
+                    name = "Progress", 
+                    labels = c("Predicted days left",
+                               "Days already spent in field")) + theme_classic() + coord_flip() 
 
+ggplotly(p, tooltip="text")
 ```
 
 ```{r, include=FALSE}
