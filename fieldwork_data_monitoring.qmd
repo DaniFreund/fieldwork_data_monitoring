@@ -52,7 +52,7 @@ snares <- file.download("1omX0nEJuQ1yhDEN9BQKks8uOF-rGxS5SfvtvR9ZB36c")
 progress <- file.download("1nEKOwT6nyV6lR-GEFP-XFKG6Trn-WzE95dFecOf7Wf4")
 ponds <- readOGR("2019_BeaverPonds/Master_2019_BeaverPonds.shp") #NAD83 / UTM zone 15N
 ponds<-st_read("2019_BeaverPonds/Master_2019_BeaverPonds.shp")
-roads <- st_read("/Users/danifreund/Desktop/Research/Beaver Hair/BeaverHair_R/roads/trails.reprojected/trails_reprojected.shp")
+roads <- st_read("/Users/danifreund/Desktop/Research/Beaver_Hair/BeaverHair_R/roads/trails.reprojected/trails_reprojected.shp")
 ```
 
 ### **WAS ALL WORK ASSIGNED TODAY FINISHED?**
