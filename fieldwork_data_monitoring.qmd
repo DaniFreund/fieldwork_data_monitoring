@@ -1,11 +1,29 @@
 ---
-title: "Tracking Wolf-Beaver Stress Field Season 2023"
+title: "Wolf-Beaver Stress 2023"
+author: "Dani Freund"
 format: 
   html:
     theme: lux
     embed-resources: true
+    toc: true
 editor: visual
 ---
+
+# OVERVIEW OF PROJECT
+
+Beavers are ecosystem engineers that can modify habitats, resulting in landscape alteration that persists for centuries. By killing these engineers, predators such as wolves can alter the ecological processes that result from engineering, producing long-term landscape effects. If the risk of wolf predation results in chronic stress for beavers, the presence of wolves alone may have cumulative landscape impacts. Analysis of plasma, a widely used method to measure hormones, reflects short term stress and methods to obtain samples, and can be detrimental to subjects. In contrast, hair is a stable medium that stores a record of blood-borne molecules, can remain detectable for years, and requires less invasive collection methods. Hair snares have been successfully used in DNA analysis due to their ease to deploy, minimal disturbance, and the stability of storing samples - but such methods have yet to be widely applied to hormone analysis. We will investigate the hormonal implications of long term exposure to wolf predation on beaver colonies using hair snares. We will 1) analyze hair glucocorticoid levels from captive beavers to establish a baseline measure - something that to our knowledge has not been attempted for beavers, and 2) compare hair cortisol levels between wild beavers (in wolf presence) and captive beavers (in wolf absence). Our findings will provide insight for wildlife management, and be at the forefront for non-invasive sampling methods.
+
+![](images/Screenshot%202023-04-26%20at%207.07.52%20PM.png)
+
+The purpose of this document is track all data entry and identify any data entry errors, as well as provide graphs that visually summarize data.
+
+#### DATA THAT NEEDS TO BE TRACKED
+
+-   **Video data**: Camera traps are set out at each hair snare, and videos are entered by people all over Minnesota.
+
+-   **Beaver hair collection and processing**: Beaver hair samples are collected from hair snares in northern Minnesota, beaver carcasses from nuisance beaver trappers all over Minnesota, and captive beavers at the Minnesota Zoo and the Henry Doorly Zoo in Nebraska. Hair is being processed at the University of Minnesota, University of Michigan, and University of Wisconsin Eau Claire.
+
+-   **Vegetation sampling**: Trees are sampled at hair snared beaver ponds in Northern Minnesota from August through the end of October.
 
 ```{r, include=FALSE}
 # /Users/danifreund/Desktop/Classes/Spring 2023/PUBH 7462 Advanced Programming in R/Final_Project/fieldwork_data_monitoring
@@ -29,6 +47,10 @@ library(geosphere)
 library(stringr)
 library(jtools)
 library(viridis, quietly = TRUE)
+library(devtools)
+library(rphylopic)
+library(dplyr)
+library(ggpattern)
 
 ```
 
@@ -50,11 +72,261 @@ file.download <- function(ID){
 transects <- file.download("128b7VHsaOiV9ZMdtM0DvEitaFL5_1jC2OHmTW56UfUQ")
 snares <- file.download("1omX0nEJuQ1yhDEN9BQKks8uOF-rGxS5SfvtvR9ZB36c")
 progress <- file.download("1nEKOwT6nyV6lR-GEFP-XFKG6Trn-WzE95dFecOf7Wf4")
-video.entry <- file.download("1zi9SEN0MQs9uOO9Xs-vv9DSmnOBPwBHPDE4nqIMjI7M")
 ponds <- readOGR("2019_BeaverPonds/Master_2019_BeaverPonds.shp") #NAD83 / UTM zone 15N
 ponds<-st_read("2019_BeaverPonds/Master_2019_BeaverPonds.shp")
 roads <- st_read("roads/trails.reprojected/trails_reprojected.shp")
+
+video.entry <- file.download("1zi9SEN0MQs9uOO9Xs-vv9DSmnOBPwBHPDE4nqIMjI7M")
+video.data <- file.download("1eu4bubab8yKacRGzHgWQj6uJbg8rKjz06yKpkZybq9E")
+
+hair.samples <- file.download("18SfvXeXoHP0gHIEC_Gm6JmN5o1mUgU8fxwtqbGuk2s8")
+hair.processed <- file.download("1nKmNl4f4eXCD8ChgvT0UUWo8Y7wSSR6VtnPmlQ0-bCM")
 ```
+
+# PROJECT TIMELINE
+
+```{r, echo=FALSE, warning = FALSE, message=FALSE}
+# downloading file
+timeline <- file.download("1Sx0BsRC1efS-JvElZSVE-OP3ANeHr-ZJ84HsWKSRn60")
+# CREATING TIMELINE
+# defining the date
+timeline$date <- with(timeline, ymd(sprintf('%04d%02d%02d', year, month, day)))
+timeline <- timeline[with(timeline, order(date)), ]
+
+# defining projects
+project_levels <- c("hair snares", "vegetation availability", "physiological validation", "biological validation")
+project_colors <- c("#0070C0", "#00B050", "#FFC000", "#C00000")
+timeline$project <- factor(timeline$project, levels=project_levels, ordered=TRUE)
+
+# orienting milestones
+positions <- c(0.5, -0.5, 1.0, -1.0, 1.5, -1.5)
+directions <- c(1, -1)
+
+line_pos <- data.frame(
+    "date"=unique(timeline$date),
+    "position"=rep(positions, length.out=length(unique(timeline$date))),
+    "direction"=rep(directions, length.out=length(unique(timeline$date)))
+)
+
+timeline <- merge(x=timeline, y=line_pos, by="date", all = TRUE)
+timeline <- timeline[with(timeline, order(date, milestone)), ]
+
+# seeing if we have more than one event per month
+text_offset <- 0.15
+timeline$month_count <- ave(timeline$date==timeline$date, timeline$date, FUN=cumsum)
+# offsetting events if there is more than one per month
+timeline$text_position <- (timeline$month_count * text_offset * timeline$direction) + timeline$position
+
+# creating dataframe that has all of the months, not just the months with events
+month_buffer <- 2 # starting two months before and ending two months after milestone
+month_date_range <- seq(min(timeline$date) - months(month_buffer), max(timeline$date) + months(month_buffer), by='month')
+month_format <- format(month_date_range, '%b %d')
+month_df <- data.frame(month_date_range, month_format)
+
+# doing the same for days
+# day_date_range <- seq(min(timeline$date) - months(month_buffer), max(timeline$date) + months(month_buffer), by='day')
+# day_date_range <- as.Date(
+#     intersect(
+#         ceiling_date(day_date_range, unit="day"),
+#         floor_date(day_date_range, unit="day")
+#     ),  origin = "1970-01-01"
+# )
+# day_format <- format(day_date_range, '%d')
+# day_df <- data.frame(day_date_range, day_format)
+
+# doing the same for years that we want to display
+year_format <- format(month_date_range, '%Y')
+year_df <- data.frame(month_date_range, year_format)
+year_df <- year_df %>% group_by(year_format=year_format) %>% dplyr::summarize(month_date_range = min(month_date_range)) 
+
+# adding label
+timeline <- timeline %>% mutate(text_label=str_c(
+  "\nDate: ", date,
+  "\nRationale: ", rationale
+))
+
+# plotting the timeline
+timeline_plot<-ggplot(timeline,aes(x=date, y=0, col=project, label=milestone))
+timeline_plot<-timeline_plot+labs(col="Projects")
+timeline_plot<-timeline_plot+scale_color_manual(values=project_colors, labels=project_levels, drop = FALSE)
+timeline_plot<-timeline_plot+theme_classic()
+
+# Plot horizontal black line for timeline
+timeline_plot<-timeline_plot+geom_hline(yintercept=0, 
+                color = "black", linewidth=0.3)
+
+# Plot vertical segment lines for milestones
+timeline_plot<-timeline_plot+geom_segment(data=timeline[timeline$month_count == 1,], aes(y=position,yend=0,xend=date), color='black', size=0.2)
+
+# Plot scatter points at zero and date
+timeline_plot<-timeline_plot+geom_point(aes(y=0), size=3)
+
+# Don't show axes, appropriately position legend
+timeline_plot<-timeline_plot+theme(axis.line.y=element_blank(),
+                 axis.text.y=element_blank(),
+                 axis.title.x=element_blank(),
+                 axis.title.y=element_blank(),
+                 axis.ticks.y=element_blank(),
+                 axis.text.x =element_blank(),
+                 axis.ticks.x =element_blank(),
+                 axis.line.x =element_blank(),
+                 legend.position = "bottom"
+                )
+
+# show day text
+timeline_plot<-timeline_plot+geom_text(data=month_df,aes(x=month_date_range,y=-0.2, label=month_format),size=2.5,vjust=0.5, color='black', angle=90)
+
+# Show text for each month
+# timeline_plot<-timeline_plot+geom_text(data=month_df, aes(x=month_date_range,y=-0.1,label=month_format),size=2.5,vjust=0.5, color='black', angle=90)
+#Show year text
+timeline_plot<-timeline_plot+geom_text(data=year_df, aes(x=month_date_range,y=-0.4,label=year_format, fontface="bold", ),size=2.5, color='black')
+# Show text for each milestone
+timeline_plot<-timeline_plot+
+  geom_text(aes(y=text_position,label=str_wrap(milestone, width=30)),size=2.5, fontface="bold")
+
+timeline_plot
+```
+
+# VIDEO DATA
+
+### HAVE ALL VIDEOS BEEN ENTERED?
+
+```{r, echo=FALSE, warning = FALSE}
+# removing images folder 
+video.entry <- subset(video.entry, hair.snare.id != "snare_02")
+
+if (any(video.entry$videos.entered == "no")) {
+  data.1 <- subset(video.entry, videos.entered == "yes") 
+  sum.1 <- sum(data.1$number.of.videos.after.cleaning)
+  sum.2 <- (sum(video.entry$number.of.videos.after.cleaning))
+  percent <- format(round((sum.1 / sum.2)*100, 2), scientific=FALSE)
+  message(warn_wrap(
+    paste(percent,"% of videos have been entered")))
+}else{
+  message("All videos are entered")}
+```
+
+```{r, echo=FALSE, warning = FALSE}
+video.entry$videos.entered <- ifelse(video.entry$videos.entered == "no", "not completed", video.entry$videos.entered)
+video.entry$videos.entered <- ifelse(video.entry$videos.entered == "yes", "completed", video.entry$videos.entered)
+
+p <- video.entry %>%
+  mutate(
+    text_label = str_c( #add as text aesthetic
+                       "Personnel: "  , personnel.that.entered.video.data, 
+                       "\nNotes: ", notes,
+                        "\nDate Collected: ", date.collected)) %>% 
+  ggplot(aes(x = hair.snare.id, y=number.of.videos.after.cleaning, 
+             fill = videos.entered,
+             text = text_label)) +
+  geom_histogram(stat = "identity", 
+                 position = "stack") + 
+  labs(y = "Number of Videos", x = "Snare ID") +
+  scale_fill_manual(values = c("darkcyan", "cyan", "gray", "darkred"),
+                    name = "Progress", 
+                    labels = c("completed",
+                               "not completed",
+                               "na",
+                               "in progress")) + theme_classic() + coord_flip() 
+
+ggplotly(p, tooltip="text")
+```
+
+### **SPECIES CAPTURED IN VIDEOS**
+
+```{r, echo=FALSE, warning = FALSE}
+# getting beaver image
+uuid <- get_uuid(name = "Castor canadensis", n = 1)
+# Get the image for that uuid
+img <- get_phylopic(uuid = uuid)
+
+p <- video.data %>%
+  mutate(text_label = str_c("Personnel: "  , personel,
+                            "\nCheck?: ", need.double.check)) %>% 
+  ggplot(aes(x = snare, 
+             fill = main.species, 
+           text = text_label)) +
+  geom_bar() + 
+  labs(y = "Hair Snare ID", 
+       x = "Number of Videos") +
+  scale_fill_discrete(name="Species")+
+  theme_classic() 
+
+p + add_phylopic(img = img, color = "salmon", alpha = 1, x=1.1, y=70, ysize=10) 
+```
+
+# HAIR PROCESSING
+
+### HOW MANY SAMPLES DO WE HAVE?
+
+```{r, echo=FALSE, warning = FALSE}
+  data <- subset(hair.samples, hair.samples$sample.type == "carcass")
+  number.carcass <- nrow(data)
+
+  data.1 <- subset(hair.samples, hair.samples$sample.type == "snare")
+  number.snare <- nrow(data.1)
+  
+message(paste("We have collected", number.carcass,"carcass samples and", number.snare, "snare samples"))
+
+processing.carcass <- hair.samples %>% subset(started.processing == "yes"&
+                                      sample.type == "carcass")
+
+message(paste(format(round(nrow(processing.carcass)/nrow(hair.samples)*100, 2)))," % of carcass samples have started processing")
+
+processing.snare <- hair.samples %>% subset(started.processing == "yes"&
+                                      sample.type == "snare")
+
+message(paste(format(round(nrow(processing.snare)/nrow(hair.samples)*100, 2)))," % of snare samples have started processing")
+```
+
+### CARCASS SAMPLES
+
+```{r, echo=FALSE, warning = FALSE}
+subset(hair.samples, hair.samples$sample.type=="carcass") %>% 
+  ggplot(aes(x=part.of.body, fill=age, color = condition.of.carcass, pattern=sex)) + geom_bar_pattern(position = position_dodge(preserve = "single"),
+                   color = "black", 
+                   pattern_fill = "black",
+                   pattern_angle = 45,
+                   pattern_density = 0.1,
+                   pattern_spacing = 0.025,
+                   pattern_key_scale_factor = 0.6) +
+  scale_pattern_manual(values = c(female = "stripe", unk = "none")) +
+  theme_classic() + theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) + 
+  labs(y = "Count", 
+       x = "Part of Beaver's Body") 
+
+```
+
+### SNARE SAMPLES
+
+```{r, echo=FALSE, warning = FALSE}
+subset(hair.samples, hair.samples$sample.type=="snare") %>%
+ggplot(aes(x = hair.snare.id, fill=amount.collected)) + 
+  geom_bar() + theme_classic() + 
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) + 
+  labs(y = "Count", 
+       x = "Hair Snare") +
+  scale_fill_manual(values = c("darkcyan", "darkred"),
+                    name = "Amount of Hair Collected", 
+                    labels = c("Larger than a quarter",
+                               "Less than a quarter"))
+```
+
+### POTENTIAL SAMPLES FOR EXTRACTION EXPERIMENTS
+
+```{r, echo=FALSE, warning = FALSE}
+candidate.samples<-subset(hair.samples, 
+       hair.samples$sample.type == "carcass" &
+       hair.samples$number.of.locations.around.body > 3 &
+       hair.samples$hair.type == "both" &
+       hair.samples$sex == "unk" &
+       hair.samples$age == "unk" &
+       hair.samples$started.processing == "no") 
+
+message(warn_wrap("The following samples are good first samples to test extraction methods with, because they are from carcasses, they have over 3 samples per carcass, they have both down and guard hair, they are not notably female, they are not kits and not notably adults, and they have been processed yet: ", paste(candidate.samples$sample.id, collapse = ", ")))
+```
+
+# VEGETATION SAMPLING
 
 ### **WAS ALL WORK ASSIGNED TODAY FINISHED?**
 
@@ -251,7 +523,7 @@ for(i in 1:nrow(transects.start)) {
 leaf
 ```
 
-### PROGRESS
+### VEGETATION SAMPLING PROGRESS
 
 ```{r, echo=FALSE, warning = FALSE}
 # GRAPH OF POND SAMPLING PROGRESS
@@ -404,108 +676,4 @@ ggplotly(p, tooltip="text")
 # 
 # # Run the application
 # shinyApp(ui = ui, server = server)
-```
-
-### PROJECT TIMELINE
-
-```{r, echo=FALSE, warning = FALSE, message = FALSE}
-# downloading file
-timeline <- file.download("1Sx0BsRC1efS-JvElZSVE-OP3ANeHr-ZJ84HsWKSRn60")
-# CREATING TIMELINE
-# defining the date
-timeline$date <- with(timeline, ymd(sprintf('%04d%02d%02d', year, month, day)))
-timeline <- timeline[with(timeline, order(date)), ]
-
-# defining projects
-project_levels <- c("hair snares", "vegetation availability", "physiological validation", "biological validation")
-project_colors <- c("#0070C0", "#00B050", "#FFC000", "#C00000")
-timeline$project <- factor(timeline$project, levels=project_levels, ordered=TRUE)
-
-# orienting milestones
-positions <- c(0.5, -0.5, 1.0, -1.0, 1.5, -1.5)
-directions <- c(1, -1)
-
-line_pos <- data.frame(
-    "date"=unique(timeline$date),
-    "position"=rep(positions, length.out=length(unique(timeline$date))),
-    "direction"=rep(directions, length.out=length(unique(timeline$date)))
-)
-
-timeline <- merge(x=timeline, y=line_pos, by="date", all = TRUE)
-timeline <- timeline[with(timeline, order(date, milestone)), ]
-
-# seeing if we have more than one event per month
-text_offset <- 0.15
-timeline$month_count <- ave(timeline$date==timeline$date, timeline$date, FUN=cumsum)
-# offsetting events if there is more than one per month
-timeline$text_position <- (timeline$month_count * text_offset * timeline$direction) + timeline$position
-
-# creating dataframe that has all of the months, not just the months with events
-month_buffer <- 2 # starting two months before and ending two months after milestone
-month_date_range <- seq(min(timeline$date) - months(month_buffer), max(timeline$date) + months(month_buffer), by='month')
-month_format <- format(month_date_range, '%b %d')
-month_df <- data.frame(month_date_range, month_format)
-
-# doing the same for days
-# day_date_range <- seq(min(timeline$date) - months(month_buffer), max(timeline$date) + months(month_buffer), by='day')
-# day_date_range <- as.Date(
-#     intersect(
-#         ceiling_date(day_date_range, unit="day"),
-#         floor_date(day_date_range, unit="day")
-#     ),  origin = "1970-01-01"
-# )
-# day_format <- format(day_date_range, '%d')
-# day_df <- data.frame(day_date_range, day_format)
-
-# doing the same for years that we want to display
-year_format <- format(month_date_range, '%Y')
-year_df <- data.frame(month_date_range, year_format)
-year_df <- year_df %>% group_by(year_format=year_format) %>% dplyr::summarize(month_date_range = min(month_date_range)) 
-
-# adding label
-timeline <- timeline %>% mutate(text_label=str_c(
-  "\nDate: ", date,
-  "\nRationale: ", rationale
-))
-
-# plotting the timeline
-timeline_plot<-ggplot(timeline,aes(x=date, y=0, col=project, label=milestone))
-timeline_plot<-timeline_plot+labs(col="Projects")
-timeline_plot<-timeline_plot+scale_color_manual(values=project_colors, labels=project_levels, drop = FALSE)
-timeline_plot<-timeline_plot+theme_classic()
-
-# Plot horizontal black line for timeline
-timeline_plot<-timeline_plot+geom_hline(yintercept=0, 
-                color = "black", linewidth=0.3)
-
-# Plot vertical segment lines for milestones
-timeline_plot<-timeline_plot+geom_segment(data=timeline[timeline$month_count == 1,], aes(y=position,yend=0,xend=date), color='black', size=0.2)
-
-# Plot scatter points at zero and date
-timeline_plot<-timeline_plot+geom_point(aes(y=0), size=3)
-
-# Don't show axes, appropriately position legend
-timeline_plot<-timeline_plot+theme(axis.line.y=element_blank(),
-                 axis.text.y=element_blank(),
-                 axis.title.x=element_blank(),
-                 axis.title.y=element_blank(),
-                 axis.ticks.y=element_blank(),
-                 axis.text.x =element_blank(),
-                 axis.ticks.x =element_blank(),
-                 axis.line.x =element_blank(),
-                 legend.position = "bottom"
-                )
-
-# show day text
-timeline_plot<-timeline_plot+geom_text(data=month_df,aes(x=month_date_range,y=-0.2, label=month_format),size=2.5,vjust=0.5, color='black', angle=90)
-
-# Show text for each month
-# timeline_plot<-timeline_plot+geom_text(data=month_df, aes(x=month_date_range,y=-0.1,label=month_format),size=2.5,vjust=0.5, color='black', angle=90)
-#Show year text
-timeline_plot<-timeline_plot+geom_text(data=year_df, aes(x=month_date_range,y=-0.4,label=year_format, fontface="bold", ),size=2.5, color='black')
-# Show text for each milestone
-timeline_plot<-timeline_plot+
-  geom_text(aes(y=text_position,label=str_wrap(milestone, width=30)),size=2.5, fontface="bold")
-
-timeline_plot
 ```
