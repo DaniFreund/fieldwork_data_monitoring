@@ -53,6 +53,10 @@ jobs:
                any::stringr
                any::jtools
                any::viridis
+               any::devtools
+               any::rphylopic
+               any::dplyr
+               any::ggpattern
 
       - name: Render document
         uses: quarto-dev/quarto-actions/render@v2
