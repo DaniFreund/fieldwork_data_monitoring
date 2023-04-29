@@ -9,6 +9,7 @@ format:
 editor: visual
 ---
 
+
 # OVERVIEW OF PROJECT
 
 Beavers are ecosystem engineers that can modify habitats, resulting in landscape alteration that persists for centuries. By killing these engineers, predators such as wolves can alter the ecological processes that result from engineering, producing long-term landscape effects. If the risk of wolf predation results in chronic stress for beavers, the presence of wolves alone may have cumulative landscape impacts. Analysis of plasma, a widely used method to measure hormones, reflects short term stress and methods to obtain samples, and can be detrimental to subjects. In contrast, hair is a stable medium that stores a record of blood-borne molecules, can remain detectable for years, and requires less invasive collection methods. Hair snares have been successfully used in DNA analysis due to their ease to deploy, minimal disturbance, and the stability of storing samples - but such methods have yet to be widely applied to hormone analysis. We will investigate the hormonal implications of long term exposure to wolf predation on beaver colonies using hair snares. We will 1) analyze hair glucocorticoid levels from captive beavers to establish a baseline measure - something that to our knowledge has not been attempted for beavers, and 2) compare hair cortisol levels between wild beavers (in wolf presence) and captive beavers (in wolf absence). Our findings will provide insight for wildlife management, and be at the forefront for non-invasive sampling methods.
@@ -24,6 +25,7 @@ The purpose of this document is track all data entry and identify any data entry
 -   **Beaver hair collection and processing**: Beaver hair samples are collected from hair snares in northern Minnesota, beaver carcasses from nuisance beaver trappers all over Minnesota, and captive beavers at the Minnesota Zoo and the Henry Doorly Zoo in Nebraska. Hair is being processed at the University of Minnesota, University of Michigan, and University of Wisconsin Eau Claire.
 
 -   **Vegetation sampling**: Trees are sampled at hair snared beaver ponds in Northern Minnesota from August through the end of October.
+
 
 ```{r, include=FALSE}
 # /Users/danifreund/Desktop/Classes/Spring 2023/PUBH 7462 Advanced Programming in R/Final_Project/fieldwork_data_monitoring
@@ -82,7 +84,9 @@ hair.samples <- file.download("18SfvXeXoHP0gHIEC_Gm6JmN5o1mUgU8fxwtqbGuk2s8")
 hair.processed <- file.download("1nKmNl4f4eXCD8ChgvT0UUWo8Y7wSSR6VtnPmlQ0-bCM")
 ```
 
+
 # PROJECT TIMELINE
+
 
 ```{r, echo=FALSE, warning = FALSE, message=FALSE}
 # downloading file
@@ -175,9 +179,11 @@ timeline_plot<-timeline_plot+
 timeline_plot
 ```
 
+
 # VIDEO DATA
 
 ### HAVE ALL VIDEOS BEEN ENTERED?
+
 
 ```{r, echo=FALSE, warning = FALSE}
 # removing images folder 
@@ -220,7 +226,9 @@ p <- video.entry %>%
 ggplotly(p, tooltip="text")
 ```
 
+
 ### **SPECIES CAPTURED IN VIDEOS**
+
 
 ```{r, echo=FALSE, warning = FALSE}
 # getting beaver image
@@ -243,9 +251,11 @@ p <- video.data %>%
 p + add_phylopic(img = img, color = "salmon", alpha = 1, x=1.1, y=70, ysize=10) 
 ```
 
+
 # HAIR PROCESSING
 
 ### HOW MANY SAMPLES DO WE HAVE?
+
 
 ```{r, echo=FALSE, warning = FALSE}
   data <- subset(hair.samples, hair.samples$sample.type == "carcass")
@@ -267,7 +277,9 @@ processing.snare <- hair.samples %>% subset(started.processing == "yes"&
 message(paste(format(round(nrow(processing.snare)/nrow(hair.samples)*100, 2)))," % of snare samples have started processing")
 ```
 
+
 ### CARCASS SAMPLES
+
 
 ```{r, echo=FALSE, warning = FALSE}
 subset(hair.samples, hair.samples$sample.type=="carcass") %>% 
@@ -284,7 +296,9 @@ subset(hair.samples, hair.samples$sample.type=="carcass") %>%
        x = "Part of Beaver's Body") 
 ```
 
+
 ### SNARE SAMPLES
+
 
 ```{r, echo=FALSE, warning = FALSE}
 subset(hair.samples, hair.samples$sample.type=="snare") %>%
@@ -299,7 +313,9 @@ ggplot(aes(x = hair.snare.id, fill=amount.collected)) +
                                "Less than a quarter"))
 ```
 
+
 ### POTENTIAL SAMPLES FOR EXTRACTION EXPERIMENTS
+
 
 ```{r, echo=FALSE, warning = FALSE}
 candidate.samples<-subset(hair.samples, 
@@ -313,9 +329,11 @@ candidate.samples<-subset(hair.samples,
 message(warn_wrap("The following samples are good first samples to test extraction methods with, because they are from carcasses, they have over 3 samples per carcass, they have both down and guard hair, they are not notably female, they are not kits and not notably adults, and they have been processed yet: ", paste(candidate.samples$sample.id, collapse = ", ")))
 ```
 
+
 # VEGETATION SAMPLING
 
 ### **WAS ALL WORK ASSIGNED TODAY FINISHED?**
+
 
 ```{r, echo=FALSE, warning = FALSE}
 # FIGURING OUT IF ANY PONDS ASSIGNED THAT DAY WERE NOT COMPLETED
@@ -331,7 +349,9 @@ if (any(progress$in.progress == "yes")) {
   message("All ponds assigned today were completed")}
 ```
 
+
 ### **HAS ALL DATA BEEN UPLOADED?**
+
 
 ```{r, echo=FALSE, warning = FALSE}
 # FIGURING OUT IF DATA UPLOAD IS COMPLETE 
@@ -347,7 +367,9 @@ if (any(progress$data.upload.complete != "yes")) {
     message("All data uploaded for today")}
 ```
 
+
 ### **MAP OF WHAT HAS BEEN COMPLETED SO FAR**
+
 
 ```{r, include=FALSE}
 # CONVERTING CRS
@@ -505,7 +527,9 @@ for(i in 1:nrow(transects.start)) {
 leaf
 ```
 
+
 ### VEGETATION SAMPLING PROGRESS
+
 
 ```{r, echo=FALSE, warning = FALSE}
 # GRAPH OF POND SAMPLING PROGRESS
@@ -543,3 +567,4 @@ p <- progress.1 %>%
 
 ggplotly(p, tooltip="text")
 ```
+
