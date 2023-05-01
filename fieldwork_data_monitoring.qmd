@@ -68,13 +68,12 @@ file.download <- function(ID){
   file <- drive_download(as_id(file_id),  path = temp_file)
   read.csv(temp_file)
 }
-here()
+
 transects <- file.download("128b7VHsaOiV9ZMdtM0DvEitaFL5_1jC2OHmTW56UfUQ")
 snares <- file.download("1omX0nEJuQ1yhDEN9BQKks8uOF-rGxS5SfvtvR9ZB36c")
 progress <- file.download("1nEKOwT6nyV6lR-GEFP-XFKG6Trn-WzE95dFecOf7Wf4")
-ponds <- readOGR("/Users/danifreund/Desktop/Classes/Spring 2023/PUBH 7462 Advanced Programming in R/Final_Project/fieldwork_data_monitoring/final/2019_BeaverPonds/Master_2019_BeaverPonds.shp") #NAD83 / UTM zone 15N
-ponds<-st_read("/Users/danifreund/Desktop/Classes/Spring 2023/PUBH 7462 Advanced Programming in R/Final_Project/fieldwork_data_monitoring/final/2019_BeaverPonds/Master_2019_BeaverPonds.shp")
-roads <- st_read("/Users/danifreund/Desktop/Classes/Spring 2023/PUBH 7462 Advanced Programming in R/Final_Project/fieldwork_data_monitoring/final/roads/trails.reprojected/trails_reprojected.shp")
+ponds<-st_read("2019_BeaverPonds/Master_2019_BeaverPonds.shp")
+roads <- st_read("roads/trails.reprojected/trails_reprojected.shp")
 
 video.entry <- file.download("1zi9SEN0MQs9uOO9Xs-vv9DSmnOBPwBHPDE4nqIMjI7M")
 video.data <- file.download("1eu4bubab8yKacRGzHgWQj6uJbg8rKjz06yKpkZybq9E")
