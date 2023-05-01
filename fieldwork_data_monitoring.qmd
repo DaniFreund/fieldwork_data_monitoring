@@ -13,7 +13,7 @@ editor: visual
 
 Beavers are ecosystem engineers that can modify habitats, resulting in landscape alteration that persists for centuries. By killing these engineers, predators such as wolves can alter the ecological processes that result from engineering, producing long-term landscape effects. If the risk of wolf predation results in chronic stress for beavers, the presence of wolves alone may have cumulative landscape impacts. Analysis of plasma, a widely used method to measure hormones, reflects short term stress and methods to obtain samples, and can be detrimental to subjects. In contrast, hair is a stable medium that stores a record of blood-borne molecules, can remain detectable for years, and requires less invasive collection methods. Hair snares have been successfully used in DNA analysis due to their ease to deploy, minimal disturbance, and the stability of storing samples - but such methods have yet to be widely applied to hormone analysis. We will investigate the hormonal implications of long term exposure to wolf predation on beaver colonies using hair snares. We will 1) analyze hair glucocorticoid levels from captive beavers to establish a baseline measure - something that to our knowledge has not been attempted for beavers, and 2) compare hair cortisol levels between wild beavers (in wolf presence) and captive beavers (in wolf absence). Our findings will provide insight for wildlife management, and be at the forefront for non-invasive sampling methods.
 
-![](Screenshot%202023-04-26%20at%207.07.52%20PM.png)
+![](final/Screenshot%202023-04-26%20at%207.07.52%20PM.png)
 
 The purpose of this document is track all data entry and identify any data entry errors, as well as provide graphs that visually summarize data.
 
